@@ -1,0 +1,19 @@
+{
+  "name": "near-discord-link",
+  "version": "0.0.1",
+  "description": "Read/Write a hashed discordId to the near wallet",
+  "scripts": {
+    "dev": "watch -d -n 1 'clear && yarn test'",
+    "test": "yarn asp -f unit.spec",
+    "clean": "rm -rf ./build && rm -rf ./neardev",
+    "build": "asb --target debug",
+    "build:release": "asb",
+    "asp": "asp --verbose --nologo"
+  },
+  "keywords": [],
+  "author": "johndoddsjr@gmail.com",
+  "license": "ISC",
+  "devDependencies": {
+    "near-sdk-as": "^3.1.0"
+  }
+}
