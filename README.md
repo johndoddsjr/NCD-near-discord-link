@@ -21,6 +21,10 @@ process can begin.
 
 The files to setup the front end of the server are located in the www folder.
 
+You can find a working example at 
+https://johndoddsjr.com/discordlink/index.html 
+
+
 # Database
 This project stores the discord-name:discordId & near:nearId in a backend
 MySQL database. This allows the bot or user to verify assets in the wallet
