@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Discord NEAR Link</title>
+    <meta name="description" content="Anonymously link discord users to NEAR blockchain wallets through a NFT">
+    <meta name="keywords" content="Discord NEAR NFT">
+    <meta name="author" content="John Dodds Jr">
+    <link rel="icon" href="favicon.ico" type="image/x-icon">
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <meta http-equiv="X-XSS-Protection" content="1; mode=block">
+    <meta http-equiv="Referrer-Policy" content="no-referrer, strict-origin-when-cross-origin">
+    <script src="lib/near-api-js.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bn.js@5.2.0/lib/bn.min.js"></script>
+    <style>
+        .item1 {
+            grid-area: header;
+        }
+
+        .item2 {
+            grid-area: leftSide;
+        }
+
+        .item3 {
+            grid-area: stepOne;
+        }
+
+        .item4 {
+            grid-area: stepTwo;
+        }
+
+        .item5 {
+            grid-area: stepThree;
+        }
+
+        .item6 {
+            grid-area: rightSide;
+        }
+
+        .item7 {
+            grid-area: footer;
+        }
+
+        .grid-container {
+            display: grid;
+            grid:
+                'header header header header header'
+                'leftSide stepOne stepTwo stepThree rightSide'
+                'footer footer footer footer footer';
+            grid-gap: 10px;
+            padding: 10px;
+        }
+
+        .grid-container>div {
+            background-color: #EAEAEA;
+            text-align: center;
+            padding: 20px 0;
+            font-size: 30px;
+        }
+    </style>
+    <script>
+        function linkAccounts() {
+            var formData = new FormData();
+            formData.append('discordId', sessionStorage.discordId);
+            formData.append('nearId', sessionStorage.nearId);
+            var req = new XMLHttpRequest();
+            req.onreadystatechange = function() {
+                if (req.readyState === 4 && req.status === 200) {
+                    var result = JSON.parse(req.responseText);
+                    document.getElementById("contract").click();
+                }
+            };
+            req.open("POST", "linkAccounts.php", true);
+            req.send(formData);
+            return;
+        }
+
+        function hashDiscordId(discordId) {
+            var formData = new FormData();
+            formData.append('discordId', discordId);
+            var req = new XMLHttpRequest();
+            req.onreadystatechange = function() {
+                if (req.readyState === 4 && req.status === 200) {
+                    var result = JSON.parse(req.responseText);
+                    sessionStorage.setItem("discordId", result[0].discordId);
+                }
+            };
+            req.open("POST", "hashId.php", true);
+            req.send(formData);
+            return;
+        }
+
+        window.onload = () => {
+            const fragment = new URLSearchParams(window.location.hash.slice(1));
+            const [accessToken, tokenType] = [fragment.get('access_token'), fragment.get('token_type')];
+            if (!accessToken) {
+                return document.getElementById('login-link').style.display = 'block';
+            }else{
+                document.getElementById("read").click();
+            }
+
+            fetch('https://discord.com/api/users/@me', {
+                    headers: {
+                        authorization: `${tokenType} ${accessToken}`,
+                    },
+                })
+                .then(result => result.json())
+                .then(response => {
+                    const {
+                        username,
+                        discriminator
+                    } = response;
+                    document.getElementById('info').innerText += `${username}#${discriminator}`;
+                    document.getElementById('login-link').style.display = 'none';
+
+                    hashDiscordId(`${username}#${discriminator}`);
+                    document.getElementById("read").click();
+
+                })
+                .catch(console.error);
+        };
+    </script>
+</head>
+
+<body>
+    <div class="grid-container" align="center">
+        <div class="item1" style="background-color: #FFFFFF;"></div>
+        <div class="item2" style="background-color: #FFFFFF;"></div>
+        <div class="item3">
+            <h2>Step 1</h2>
+            <img src="images/near.webp" alt="NEAR logo" />
+            <br><a id="connect_near" href="#"><span id="step1">Connect to NEAR</span></a>
+            <script>
+                (async () => {
+                    const {
+                        connect,
+                        keyStores,
+                        WalletConnection
+                    } = nearApi;
+
+                    const button = document.getElementById('connect_near');
+
+                    const near = await connect(config());
+                    const wallet = new WalletConnection(near, 'ncd-ii');
+
+                    if (wallet.isSignedIn()) {
+                        const accountId = wallet.getAccountId();
+                        button.innerHTML = `Logout ${accountId}`;
+                        hashNearId(`${accountId}`);
+                        button.addEventListener('click', signOut);
+                    } else {
+                        button.addEventListener('click', signIn);
+                    }
+
+                    function hashNearId(nearId) {
+                        var formData = new FormData();
+                        formData.append('nearId', nearId);
+                        var req = new XMLHttpRequest();
+                        req.onreadystatechange = function() {
+                            if (req.readyState === 4 && req.status === 200) {
+                                var result = JSON.parse(req.responseText);
+                                sessionStorage.setItem("nearId", result[0].nearId);
+                            }
+                        };
+                        req.open("POST", "hashId.php", true);
+                        req.send(formData);
+                        return;
+                    }
+
+                    function signIn() {
+                        wallet.requestSignIn({
+                            contractId: 'discordlink.dodds.testnet',
+                            methodNames: ['write']
+                        });
+                    }
+
+                    function signOut() {
+                        wallet.signOut();
+                        sessionStorage.removeItem('nearId');
+                        button.innerHTML = `Connect to NEAR`;
+                        button.addEventListener('click', signIn);
+                    }
+
+                    function config() {
+                        return {
+                            networkId: 'testnet',
+                            keyStore: new keyStores.BrowserLocalStorageKeyStore(),
+                            nodeUrl: 'https://rpc.testnet.near.org',
+                            walletUrl: 'https://wallet.testnet.near.org',
+                            helperUrl: 'https://helper.testnet.near.org',
+                            explorerUrl: 'https://explorer.testnet.near.org'
+                        };
+                    }
+                })();
+            </script>
+
+        </div>
+        <div class="item4">
+            <h2>Step 2</h2>
+            <img src="images/discord.webp" alt="discord logo" />
+            <br>
+            <div class="col-md-12" id="login">
+                <a id="login-link" href='https://discord.com/api/oauth2/authorize?client_id=916630115318890546&redirect_uri=https%3A%2F%2Fjohndoddsjr.com%2Fdiscordlink%2Findex.html&response_type=token&scope=identify'>Connect to Discord</a>
+            </div>
+            <div id="info"></div>
+        </div>
+        <div class="item5">
+            <h2>Step 3</h2>
+            <a id="link" href="#" style="display: none;" onclick="linkAccounts()"><img src="images/link.webp" alt="Link Accounts Icon" /><br>Link Accounts</a>
+            <a id="contract" href="#" style="display: none;"></a>
+            <a id="unlink" href="#" style="display: none; color: red;"><img src="images/link.webp" alt="Link Accounts Icon" /><br>UnLink Accounts<br>Account Exists</span></a>
+            <h5 id="result"></h5>
+            <button id="read" style="display: none;">read</button>
+            <script>
+                (async () => {
+                    const {
+                        connect,
+                        keyStores,
+                        WalletConnection
+                    } = nearApi;
+
+                    const CONTRACT_ID = 'dev-1648586346439-52425942740179';
+                    const near = await connect(config());
+                    const wallet = new WalletConnection(near, 'ncd-ii');
+                    const dom = setupDOMBindings();
+
+                    const contract = {
+                        readKey: async () => await view(CONTRACT_ID, 'read', {}),
+                        writeKey: async () => await change(CONTRACT_ID, 'write', {
+                            value: sessionStorage.discordId
+                        }, typeof gas !== 'undefined' ? gas : null),
+                        eraseKey: async () => await change(CONTRACT_ID, 'write', {
+                            value: '0'
+                        }, typeof gas !== 'undefined' ? gas : null)
+                    };
+
+                    if (wallet.isSignedIn()) {
+                        const accountId = wallet.getAccountId();
+                        dom.btnRead.addEventListener('click', contract.readKey);
+                        dom.btnLink.addEventListener('click', contract.writeKey);
+                        dom.btnUnLink.addEventListener('click', contract.eraseKey);
+
+                    }
+
+                    async function change(contract, method, args, gas, amount) {
+                        console.log('attempting to send signed transaction ...');
+                        const response = await wallet.account().functionCall(contract, method, args, gas, amount);
+                        console.log('response received.');
+
+                        const {
+                            transaction_outcome: txo,
+                            status
+                        } = response;
+
+                        console.log(`gas burned: ${txo.outcome.gas_burnt}`);
+                        console.log(`tokens burned: ${txo.outcome.tokens_burnt}`);
+                        console.log(`logs: \n${txo.outcome.logs}`);
+
+                        const {
+                            SuccessValue: value
+                        } = status;
+
+
+                        console.log(b64DecodeUnicode(value));
+                        dom.btnRead.click();
+                    }
+
+                    async function view(contract, method, args) {
+                        const response = await wallet.account().viewFunction(contract, method, args);
+
+                        const regexExp = /^[a-f0-9]{64}$/gi;
+
+                        console.log(response);
+
+                        const myArray = response.split(" ");
+                        const hash = myArray[8];
+                        if (regexExp.test(hash)) {
+                            document.getElementById("link").style.display = "none";
+                            document.getElementById("unlink").style.display = "block";
+                            // dom.btnRead.click();
+
+                        } else {
+                            if (regexExp.test(sessionStorage.discordId)) {
+                                document.getElementById("link").style.display = "block";
+                            } else {
+                                document.getElementById("link").style.display = "none";
+                            }
+                            document.getElementById("unlink").style.display = "none";
+                        }
+                    }
+
+                    function config() {
+                        return {
+                            networkId: 'testnet',
+                            keyStore: new keyStores.BrowserLocalStorageKeyStore(),
+                            nodeUrl: 'https://rpc.testnet.near.org',
+                            walletUrl: 'https://wallet.testnet.near.org',
+                            helperUrl: 'https://helper.testnet.near.org',
+                            explorerUrl: 'https://explorer.testnet.near.org'
+                        };
+                    }
+
+                    function setupDOMBindings() {
+                        return {
+                            btnRead: document.querySelector('#read'),
+                            btnLink: document.querySelector('#contract'),
+                            btnUnLink: document.querySelector('#unlink'),
+                        };
+                    }
+
+                    // ------------------------
+                    // see here for decoding simple ASCII response https://stackoverflow.com/q/33854103/2836874
+                    // see here for decoding UTF-8 data in response (eg. if you want emoji support) https://stackoverflow.com/a/30106551/2836874
+                    // ------------------------
+                    // Encoding UTF8 ⇢ base64
+                    function b64EncodeUnicode(str) {
+                        return btoa(
+                            encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, function(match, p1) {
+                                return String.fromCharCode(parseInt(p1, 16));
+                            })
+                        );
+                    }
+
+                    // Decoding base64 ⇢ UTF8
+                    function b64DecodeUnicode(str) {
+                        return decodeURIComponent(
+                            Array.prototype.map
+                            .call(atob(str), function(c) {
+                                return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                            })
+                            .join('')
+                        );
+                    }
+                })();
+            </script>
+        </div>
+        <div class="item6" style="background-color: #FFFFFF;"></div>
+        <div class="item7" style="background-color: #FFFFFF;"></div>
+    </div>
+</body>
+
+</html>
